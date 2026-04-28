@@ -1,0 +1,45 @@
+sequenceDiagram
+    participant U as User
+    participant CH as User Channel
+    participant GW as API Gateway
+    participant LG as LangGraph Runtime
+    participant IA as Intake Agent Node
+    participant KA as Knowledge Agent (RAG)
+    participant WF as Workflow Agent (MCP)
+    participant EA as Escalation Agent
+    participant MC as MCP Tools
+    participant IT as ITSM System
+    participant HU as Human IT
+
+    U->>CH: Sends request (e.g., "Reset my VPN password" or "VPN keeps dropping")
+    CH->>GW: Normalize + forward message
+    GW->>LG: Deliver ChatEvent + session context
+    LG->>IA: Determine intent, entities, severity
+    IA-->>LG: intent/request_type, system, confidence, severity
+
+    alt [Informational Query]
+        LG->>KA: Perform RAG search via PDFs + Chroma
+        KA->>KA: Retrieve chunks, build context prompt
+        KA-->>LG: Provide answer + citations
+        LG-->>CH: Final Answer (no automation)
+    end
+
+    alt [Action or Incident]
+        LG->>WF: Execute workflow (e.g., reset password, get logs)
+        WF->>MC: Call tools (idp.reset_password, logs.get_recent)
+        MC-->>WF: Tool responses (success/failure)
+        WF-->>LG: Workflow completed or partially failed
+
+        alt [Workflow Succeeded]
+            LG-->>CH: Output completion summary + ticket ID
+        end
+
+        Note over LG,EA: [Requires Escalation]
+        LG->>EA: Summarize issue + diagnostics
+        EA->>IT: itsm.create_incident()
+        IT->>IT: Create incident with context
+        IT-->>EA: Ticket ID
+        EA-->>LG: Escalation summary
+        LG-->>CH: "Escalated to IT: Ticket #INC-..."
+        IT->>HU: Assign incident + AI context
+    end
