@@ -1,0 +1,74 @@
+graph TD
+    subgraph UserChannels["User Channels"]
+        User["User\nSlack / Teams / Web /"]
+    end
+
+    User --> APIGateway
+
+    subgraph APIGateway["API Gateway\nAuth, Rate Limits, Channel Normalization"]
+    end
+
+    APIGateway --> LangGraphRuntime
+
+    subgraph LangGraphOrch["LangGraph Orchestration Layer"]
+        LangGraphRuntime["LangGraph Runtime\n(Graph State, Routing, Decision Nodes)"]
+
+        subgraph AgentNodes["Agent Nodes"]
+            IntakeAgent["Intake Agent\n(Intent Classification)"]
+            EscalationAgent["Escalation Agent"]
+            WorkflowAgent["Workflow Agent\n(MCP)"]
+            KnowledgeAgent["Knowledge Agent\n(RAG over PDFs + Chroma)"]
+        end
+
+        GraphState["(GraphState Store\nIntent, Entities, RAG Docs,)"]
+
+        LangGraphRuntime --> IntakeAgent
+        LangGraphRuntime --> EscalationAgent
+        LangGraphRuntime --> WorkflowAgent
+        LangGraphRuntime --> KnowledgeAgent
+
+        IntakeAgent --> GraphState
+        EscalationAgent --> GraphState
+        WorkflowAgent --> GraphState
+        KnowledgeAgent --> GraphState
+    end
+
+    subgraph MCPLayer["Model Context Protocol Tool Layer"]
+        MCPClient["MCP Client\n(Pinecone Tools / Other)"]
+
+        subgraph IDPTools["IDP Tools"]
+            reset_password["reset_password()"]
+            unlock_account["unlock_account()"]
+        end
+
+        subgraph LoggingTools["Logging Tools"]
+            get_recent_logs["get_recent_logs()"]
+        end
+
+        subgraph ITSMTools["ITSM Tools"]
+            create_ticket["create_ticket()"]
+            create_incident["create_incident()"]
+        end
+
+        MCPClient --> reset_password
+        MCPClient --> unlock_account
+        MCPClient --> get_recent_logs
+        MCPClient --> create_ticket
+        MCPClient --> create_incident
+    end
+
+    subgraph RAGLayer["RAG Layer"]
+        PDFDocs["Uploaded PDF Documents\nRunbooks, Policies, How-To Guides"]
+        TextSplitter["Text Splitter"]
+        OpenAI["OpenAI"]
+        ChromaVector["Chroma Vector Store"]
+
+        PDFDocs --> TextSplitter
+        TextSplitter --> OpenAI
+        OpenAI --> ChromaVector
+    end
+
+    WorkflowAgent --> MCPClient
+    KnowledgeAgent --> ChromaVector
+    create_ticket --> HumanIT["Human IT Support"]
+    create_incident --> HumanIT
